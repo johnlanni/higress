@@ -1,7 +1,6 @@
 package provider
 
 import (
-	"encoding/json"
 	"net/http"
 	"path"
 	"strings"
@@ -10,6 +9,7 @@ import (
 	"github.com/alibaba/higress/plugins/wasm-go/pkg/wrapper"
 	"github.com/higress-group/proxy-wasm-go-sdk/proxywasm"
 	"github.com/higress-group/proxy-wasm-go-sdk/proxywasm/types"
+	"github.com/tidwall/sjson"
 )
 
 // openaiProvider is the provider for OpenAI service.
@@ -128,13 +128,12 @@ func (m *openaiProvider) OnRequestBody(ctx wrapper.HttpContext, apiName ApiName,
 
 func (m *openaiProvider) TransformRequestBody(ctx wrapper.HttpContext, apiName ApiName, body []byte, log wrapper.Log) ([]byte, error) {
 	if m.config.responseJsonSchema != nil {
-		request := &chatCompletionRequest{}
-		if err := decodeChatCompletionRequest(body, request); err != nil {
-			return nil, err
-		}
+		var err error
 		log.Debugf("[ai-proxy] set response format to %s", m.config.responseJsonSchema)
-		request.ResponseFormat = m.config.responseJsonSchema
-		body, _ = json.Marshal(request)
+		body, err = sjson.SetBytes(body, "response_format", m.config.responseJsonSchema)
+		if err != nil {
+			log.Errorf("set response json schema failed, err:%s", err)
+		}
 	}
 	return m.config.defaultTransformRequestBody(ctx, apiName, body, log)
 }
