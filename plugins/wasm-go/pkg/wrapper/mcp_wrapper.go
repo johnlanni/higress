@@ -15,14 +15,11 @@
 package wrapper
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 
 	"github.com/alibaba/higress/plugins/wasm-go/pkg/log"
 	"github.com/higress-group/proxy-wasm-go-sdk/proxywasm/types"
-	"github.com/invopop/jsonschema"
 	"github.com/tidwall/gjson"
 )
 
@@ -208,14 +205,14 @@ func (ctx *CommonHttpCtx[PluginConfig]) registerMCPToolProcessor() {
 	}
 }
 
-func ToInputSchema(v any) map[string]any {
-	t := reflect.TypeOf(v)
-	if t.Kind() == reflect.Ptr {
-		t = t.Elem()
-	}
-	inputSchema := jsonschema.Reflect(v).Definitions[t.Name()]
-	inputSchemaBytes, _ := json.Marshal(inputSchema)
-	var result map[string]any
-	json.Unmarshal(inputSchemaBytes, &result)
-	return result
-}
+// func ToInputSchema(v any) map[string]any {
+// 	t := reflect.TypeOf(v)
+// 	if t.Kind() == reflect.Ptr {
+// 		t = t.Elem()
+// 	}
+// 	inputSchema := jsonschema.Reflect(v).Definitions[t.Name()]
+// 	inputSchemaBytes, _ := json.Marshal(inputSchema)
+// 	var result map[string]any
+// 	json.Unmarshal(inputSchemaBytes, &result)
+// 	return result
+// }
