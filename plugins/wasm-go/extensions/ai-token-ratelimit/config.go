@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/alibaba/higress/plugins/wasm-go/pkg/log"
 	"github.com/alibaba/higress/plugins/wasm-go/pkg/wrapper"
 	"github.com/tidwall/gjson"
 	re "github.com/wasilibs/go-re2"
@@ -83,7 +82,7 @@ type LimitConfigItem struct {
 	timeWindow int64               // 时间窗口大小
 }
 
-func initRedisClusterClient(json gjson.Result, config *ClusterKeyRateLimitConfig, log log.Log) error {
+func initRedisClusterClient(json gjson.Result, config *ClusterKeyRateLimitConfig, log wrapper.Log) error {
 	redisConfig := json.Get("redis")
 	if !redisConfig.Exists() {
 		return errors.New("missing redis in config")

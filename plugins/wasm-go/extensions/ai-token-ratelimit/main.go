@@ -22,7 +22,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/alibaba/higress/plugins/wasm-go/pkg/log"
 	"github.com/alibaba/higress/plugins/wasm-go/pkg/wrapper"
 	"github.com/higress-group/proxy-wasm-go-sdk/proxywasm"
 	"github.com/higress-group/proxy-wasm-go-sdk/proxywasm/types"
@@ -80,7 +79,7 @@ type LimitRedisContext struct {
 	window int64
 }
 
-func parseConfig(json gjson.Result, config *ClusterKeyRateLimitConfig, log log.Log) error {
+func parseConfig(json gjson.Result, config *ClusterKeyRateLimitConfig, log wrapper.Log) error {
 	err := initRedisClusterClient(json, config, log)
 	if err != nil {
 		return err
@@ -92,7 +91,7 @@ func parseConfig(json gjson.Result, config *ClusterKeyRateLimitConfig, log log.L
 	return nil
 }
 
-func onHttpRequestHeaders(ctx wrapper.HttpContext, config ClusterKeyRateLimitConfig, log log.Log) types.Action {
+func onHttpRequestHeaders(ctx wrapper.HttpContext, config ClusterKeyRateLimitConfig, log wrapper.Log) types.Action {
 	// 判断是否命中限流规则
 	val, ruleItem, configItem := checkRequestAgainstLimitRule(ctx, config.ruleItems, log)
 	if ruleItem == nil || configItem == nil {
@@ -140,7 +139,7 @@ func onHttpRequestHeaders(ctx wrapper.HttpContext, config ClusterKeyRateLimitCon
 	return types.ActionPause
 }
 
-func onHttpStreamingBody(ctx wrapper.HttpContext, config ClusterKeyRateLimitConfig, data []byte, endOfStream bool, log log.Log) []byte {
+func onHttpStreamingBody(ctx wrapper.HttpContext, config ClusterKeyRateLimitConfig, data []byte, endOfStream bool, log wrapper.Log) []byte {
 	var inputToken, outputToken int64
 	if inputToken, outputToken, ok := getUsage(data); ok {
 		ctx.SetContext("input_token", inputToken)
@@ -186,7 +185,7 @@ func getUsage(data []byte) (inputTokenUsage int64, outputTokenUsage int64, ok bo
 	return
 }
 
-func checkRequestAgainstLimitRule(ctx wrapper.HttpContext, ruleItems []LimitRuleItem, log log.Log) (string, *LimitRuleItem, *LimitConfigItem) {
+func checkRequestAgainstLimitRule(ctx wrapper.HttpContext, ruleItems []LimitRuleItem, log wrapper.Log) (string, *LimitRuleItem, *LimitConfigItem) {
 	for _, rule := range ruleItems {
 		val, ruleItem, configItem := hitRateRuleItem(ctx, rule, log)
 		if ruleItem != nil && configItem != nil {
@@ -196,7 +195,7 @@ func checkRequestAgainstLimitRule(ctx wrapper.HttpContext, ruleItems []LimitRule
 	return "", nil, nil
 }
 
-func hitRateRuleItem(ctx wrapper.HttpContext, rule LimitRuleItem, log log.Log) (string, *LimitRuleItem, *LimitConfigItem) {
+func hitRateRuleItem(ctx wrapper.HttpContext, rule LimitRuleItem, log wrapper.Log) (string, *LimitRuleItem, *LimitConfigItem) {
 	switch rule.limitType {
 	// 根据HTTP请求头限流
 	case limitByHeaderType, limitByPerHeaderType:
@@ -255,7 +254,7 @@ func hitRateRuleItem(ctx wrapper.HttpContext, rule LimitRuleItem, log log.Log) (
 	return "", nil, nil
 }
 
-func logDebugAndReturnEmpty(log log.Log, errMsg string, args ...interface{}) (string, *LimitRuleItem, *LimitConfigItem) {
+func logDebugAndReturnEmpty(log wrapper.Log, errMsg string, args ...interface{}) (string, *LimitRuleItem, *LimitConfigItem) {
 	log.Debugf(errMsg, args...)
 	return "", nil, nil
 }
