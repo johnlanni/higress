@@ -162,7 +162,7 @@ buildx-prepare:
 build-gateway: prebuild buildx-prepare build-golang-filter
 	USE_REAL_USER=1 TARGET_ARCH=amd64 DOCKER_TARGETS="docker.proxyv2" ./tools/hack/build-istio-image.sh init
 	USE_REAL_USER=1 TARGET_ARCH=arm64 DOCKER_TARGETS="docker.proxyv2" ./tools/hack/build-istio-image.sh init
-	DOCKER_TARGETS="docker.proxyv2" IMG_URL="${IMG_URL}" ./tools/hack/build-istio-image.sh docker.buildx
+	DOCKER_TARGETS="docker.proxyv2" ./tools/hack/build-istio-image.sh docker.buildx
 
 build-gateway-local: prebuild build-golang-filter
 	TARGET_ARCH=${TARGET_ARCH} DOCKER_TARGETS="docker.proxyv2" ./tools/hack/build-istio-image.sh docker
@@ -172,7 +172,7 @@ build-golang-filter:
 	TARGET_ARCH=arm64 ./tools/hack/build-golang-filters.sh
 
 build-istio: prebuild buildx-prepare
-	DOCKER_TARGETS="docker.pilot" IMG_URL="${IMG_URL}" ./tools/hack/build-istio-image.sh docker.buildx
+	DOCKER_TARGETS="docker.pilot" ./tools/hack/build-istio-image.sh docker.buildx
 
 build-istio-local: prebuild
 	TARGET_ARCH=${TARGET_ARCH} DOCKER_TARGETS="docker.pilot" ./tools/hack/build-istio-image.sh docker
