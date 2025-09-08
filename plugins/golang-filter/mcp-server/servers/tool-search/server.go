@@ -15,67 +15,118 @@ func init() {
 	common.GlobalRegistry.RegisterServer("tool-search", &ToolSearchConfig{})
 }
 
+type VectorConfig struct {
+	Type         string  `json:"type"`
+	VectorWeight float64 `json:"vectorWeight"`
+	TableName    string  `json:"tableName"`
+	DSN          string  `json:"dsn"`
+}
+
+type EmbeddingConfig struct {
+	APIKey     string `json:"apiKey"`
+	BaseURL    string `json:"baseURL"`
+	Model      string `json:"model"`
+	Dimensions int    `json:"dimensions"`
+}
+
 type ToolSearchConfig struct {
-	dsn          string
-	apiKey       string
-	baseURL      string
-	model        string
-	dimensions   int
-	vectorWeight float64
-	tableName    string
-	description  string
+	Vector      VectorConfig    `json:"vector"`
+	Embedding   EmbeddingConfig `json:"embedding"`
+	description string
 }
 
 func (c *ToolSearchConfig) ParseConfig(config map[string]any) error {
-	dsn, ok := config["dsn"].(string)
+	// Parse vector configuration
+	vectorConfig, ok := config["vector"].(map[string]any)
 	if !ok {
-		return errors.New("missing dsn")
+		return errors.New("missing vector configuration")
 	}
-	c.dsn = dsn
 
-	apiKey, ok := config["apiKey"].(string)
+	if err := c.parseVectorConfig(vectorConfig); err != nil {
+		return fmt.Errorf("failed to parse vector config: %w", err)
+	}
+
+	// Parse embedding configuration
+	embeddingConfig, ok := config["embedding"].(map[string]any)
 	if !ok {
-		return errors.New("missing apiKey")
+		return errors.New("missing embedding configuration")
 	}
-	c.apiKey = apiKey
 
-	// Optional configurations with defaults
-	if baseURL, ok := config["baseURL"].(string); ok {
-		c.baseURL = baseURL
+	if err := c.parseEmbeddingConfig(embeddingConfig); err != nil {
+		return fmt.Errorf("failed to parse embedding config: %w", err)
+	}
+
+	// Optional description
+	if description, ok := config["description"].(string); ok {
+		c.description = description
 	} else {
-		c.baseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-	}
-
-	if model, ok := config["model"].(string); ok {
-		c.model = model
-	} else {
-		c.model = "text-embedding-v4"
-	}
-
-	if dimensions, ok := config["dimensions"].(float64); ok {
-		c.dimensions = int(dimensions)
-	} else {
-		c.dimensions = 1024
-	}
-
-	if vectorWeight, ok := config["vectorWeight"].(float64); ok {
-		c.vectorWeight = vectorWeight
-	} else {
-		c.vectorWeight = 0.5
-	}
-
-	if tableName, ok := config["tableName"].(string); ok {
-		c.tableName = tableName
-	} else {
-		c.tableName = "apig_mcp_tools"
-	}
-
-	c.description, ok = config["description"].(string)
-	if !ok {
 		c.description = "Tool search server for semantic similarity search"
 	}
 
 	api.LogDebugf("ToolSearchConfig ParseConfig: %+v", config)
+	return nil
+}
+
+func (c *ToolSearchConfig) parseVectorConfig(config map[string]any) error {
+	// Parse type (required)
+	if vectorType, ok := config["type"].(string); ok {
+		c.Vector.Type = vectorType
+	} else {
+		return errors.New("missing vector.type")
+	}
+
+	// Parse DSN (required)
+	if dsn, ok := config["dsn"].(string); ok {
+		c.Vector.DSN = dsn
+	} else {
+		return errors.New("missing vector.dsn")
+	}
+
+	// Parse optional fields with defaults
+	if vectorWeight, ok := config["vectorWeight"].(float64); ok {
+		c.Vector.VectorWeight = vectorWeight
+	} else {
+		c.Vector.VectorWeight = 0.5
+	}
+
+	if tableName, ok := config["tableName"].(string); ok {
+		c.Vector.TableName = tableName
+	} else {
+		c.Vector.TableName = "apig_mcp_tools"
+	}
+
+	return nil
+}
+
+func (c *ToolSearchConfig) parseEmbeddingConfig(config map[string]any) error {
+	// Parse API key (required)
+	if apiKey, ok := config["apiKey"].(string); ok {
+		c.Embedding.APIKey = apiKey
+	} else {
+		return errors.New("missing embedding.apiKey")
+	}
+
+	// Parse optional fields with defaults
+	if baseURL, ok := config["baseURL"].(string); ok {
+		c.Embedding.BaseURL = baseURL
+	} else {
+		c.Embedding.BaseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+	}
+
+	if model, ok := config["model"].(string); ok {
+		c.Embedding.Model = model
+	} else {
+		c.Embedding.Model = "text-embedding-v4"
+	}
+
+	if dimensions, ok := config["dimensions"].(float64); ok {
+		c.Embedding.Dimensions = int(dimensions)
+	} else if dimensions, ok := config["dimensions"].(int); ok {
+		c.Embedding.Dimensions = dimensions
+	} else {
+		c.Embedding.Dimensions = 1024
+	}
+
 	return nil
 }
 
@@ -87,14 +138,14 @@ func (c *ToolSearchConfig) NewServer(serverName string) (*common.MCPServer, erro
 	)
 
 	// Create database client
-	dbClient := NewDBClient(c.dsn, c.tableName, mcpServer.GetDestoryChannel())
+	dbClient := NewDBClient(c.Vector.DSN, c.Vector.TableName, mcpServer.GetDestoryChannel())
 
 	// Create embedding client
-	embeddingClient := NewEmbeddingClient(c.apiKey, c.baseURL, c.model, c.dimensions)
+	embeddingClient := NewEmbeddingClient(c.Embedding.APIKey, c.Embedding.BaseURL, c.Embedding.Model, c.Embedding.Dimensions)
 
 	// Create search service
-	textWeight := 1.0 - c.vectorWeight
-	searchService := NewSearchService(dbClient, embeddingClient, c.vectorWeight, textWeight)
+	textWeight := 1.0 - c.Vector.VectorWeight
+	searchService := NewSearchService(dbClient, embeddingClient, c.Vector.VectorWeight, textWeight)
 
 	// Add tool search tool
 	mcpServer.AddTool(

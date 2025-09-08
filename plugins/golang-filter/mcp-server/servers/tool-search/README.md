@@ -28,37 +28,66 @@ CREATE TABLE apig_mcp_tools (
     vector VECTOR(1024)  -- Requires pgvector extension
 );
 
--- Create full-text search index (using pgsearch)
-CREATE INDEX idx_tools_description_pgsearch ON apig_mcp_tools USING gin(description gin_pgsearch_ops);
+-- Create vector index using ann method with HNSW algorithm
+CREATE INDEX idx_tools_vector ON apig_mcp_tools USING ann(vector) 
+WITH (dim = 1024, algorithm = hnswflat, distancemeasure = L2, vector_include = 0);
 
--- Create vector index
-CREATE INDEX idx_tools_vector ON apig_mcp_tools USING ivfflat (vector vector_cosine_ops) WITH (lists = 100);
+-- Create full-text search index using pgsearch BM25
+CALL pgsearch.create_bm25(
+    index_name => 'idx_tools_description_bm25',
+    table_name => 'apig_mcp_tools',
+    text_fields => '{description: {}}'
+);
 ```
 
 ## Configuration Parameters
 
+### Root Level Configuration
+
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
+| vector | object | Yes | - | Vector database configuration (see [Vector Configuration](#vector-configuration) below) |
+| embedding | object | Yes | - | Embedding API configuration (see [Embedding Configuration](#embedding-configuration) below) |
+| description | string | No | Tool search server for semantic similarity search | Server description |
+
+### Vector Configuration
+
+Configuration object for the `vector` field:
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
+| type | string | Yes | - | Vector database type (currently only "postgres" supported) |
 | dsn | string | Yes | - | PostgreSQL database connection string |
+| vectorWeight | float64 | No | 0.5 | Vector search weight (0-1), textWeight = 1 - vectorWeight |
+| tableName | string | No | apig_mcp_tools | Database table name |
+
+### Embedding Configuration
+
+Configuration object for the `embedding` field:
+
+| Parameter | Type | Required | Default | Description |
+|-----------|------|----------|---------|-------------|
 | apiKey | string | Yes | - | API Key for the embedding service |
 | baseURL | string | No | https://dashscope.aliyuncs.com/compatible-mode/v1 | Base URL for OpenAI-compatible embedding API |
 | model | string | No | text-embedding-v4 | Vector model name |
 | dimensions | int | No | 1024 | Vector dimensions |
-| vectorWeight | float64 | No | 0.5 | Vector search weight (0-1), textWeight = 1 - vectorWeight |
-| tableName | string | No | apig_mcp_tools | Database table name |
-| description | string | No | Tool search server for semantic similarity search | Server description |
 
 ## Configuration Example
 
 ```json
 {
-  "dsn": "host=localhost user=postgres password=password dbname=mcp_tools port=5432 sslmode=disable",
-  "apiKey": "your-api-key",
-  "baseURL": "https://api.openai.com/v1",
-  "model": "text-embedding-3-small",
-  "dimensions": 1536,
-  "vectorWeight": 0.6,
-  "tableName": "apig_mcp_tools",
+  "vector": {
+    "type": "postgres",
+    "vectorWeight": 0.5,
+    "tableName": "apig_mcp_tools",
+    "dsn": "host=localhost user=postgres password=password dbname=mcp_tools port=5432 sslmode=disable"
+  },
+  "embedding": {
+    "apiKey": "your-dashscope-api-key",
+    "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "model": "text-embedding-v4",
+    "dimensions": 1024
+  },
   "description": "MCP Tools Search Server"
 }
 ```
@@ -94,23 +123,36 @@ Note: Each tool definition in the `tools` array directly uses the complete JSON 
 
 This server uses the following hybrid search algorithm:
 
-1. **Vector Search**: Uses cosine similarity to calculate similarity between query vector and tool description vectors
-2. **Full-text Search**: Uses pgsearch extension's `@@@` operator for advanced full-text search
-3. **Hybrid Scoring**: Final score = Full-text score × (1 - vectorWeight) + Vector similarity score × vectorWeight
+1. **Vector Search**: Uses cosine similarity with HNSW algorithm for efficient semantic similarity search
+2. **Full-text Search**: Uses pgsearch BM25 algorithm for advanced text matching and ranking
+3. **Hybrid Scoring**: Final score = BM25 score × (1 - vectorWeight) + Vector similarity score × vectorWeight
+
+### Vector Search Implementation
+
+Uses PostgreSQL's ann index with HNSW algorithm for efficient vector similarity search:
+
+```sql
+-- Vector similarity using cosine similarity
+SELECT 
+    cosine_similarity(vector, query_vector) AS similarity_score
+FROM apig_mcp_tools
+WHERE vector IS NOT NULL
+ORDER BY vector <-> query_vector
+```
 
 ### Full-text Search Implementation
 
-Uses pgsearch extension's advanced full-text search capabilities:
+Uses pgsearch extension's BM25 algorithm for advanced full-text search:
 
 ```sql
 SELECT 
-    description @@@ pgsearch.config('text:query_text') AS score
+    description @@@ pgsearch.config('text:query_text') AS bm25_score
 FROM apig_mcp_tools
 WHERE description @@@ pgsearch.config('text:query_text')
-ORDER BY score
+ORDER BY bm25_score DESC
 ```
 
-This approach provides more precise text matching and scoring mechanisms.
+BM25 provides state-of-the-art text ranking based on term frequency and document frequency.
 
 ## Fallback Mechanism
 

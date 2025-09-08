@@ -1,9 +1,15 @@
 -- Hybrid search query examples
--- This query demonstrates how to use vector similarity search and pgsearch full-text search for hybrid ranking
+-- This query demonstrates how to use vector similarity search and pgsearch BM25 full-text search for hybrid ranking
+
+-- Create necessary indexes (run once during setup):
+-- Vector index using ann method:
+-- CREATE INDEX idx_tools_vector ON apig_mcp_tools USING ann(vector) WITH (dim = 1024, algorithm = hnswflat, distancemeasure = L2, vector_include = 0);
+-- Full-text search index using pgsearch BM25:
+-- CALL pgsearch.create_bm25(index_name => 'idx_tools_description_bm25', table_name => 'apig_mcp_tools', text_fields => '{description: {}}');
 
 -- Example query: Search for tools related to "weather data"
 WITH t1 AS (
-    -- Full-text search part: Use pgsearch for text matching
+    -- Full-text search part: Use pgsearch BM25 for text matching
     SELECT
         id,
         server_name,
@@ -15,7 +21,7 @@ WITH t1 AS (
         2 AS source
     FROM apig_mcp_tools
     WHERE description @@@ pgsearch.config('text:weather data')
-    ORDER BY score
+    ORDER BY score DESC
     LIMIT 10
 ),
 t2 AS (
@@ -43,32 +49,33 @@ SELECT
     COALESCE(t1.description, t2.description) as description,
     COALESCE(t1.metadata, t2.metadata) as metadata,
     COALESCE(t1.vector, t2.vector) as vector,
-    -- Hybrid scoring: full-text score * 0.5 + vector similarity score * 0.5
-    COALESCE(ABS(t1.score), 0.0) * 0.5 + COALESCE(t2.score, 0.0) * 0.5 AS hybrid_score
+    -- Hybrid scoring: text score weight * 0.2 + vector score weight * 0.8
+    -- Weights can be adjusted based on business requirements
+    COALESCE(ABS(t1.score), 0.0) * 0.2 + COALESCE(t2.score, 0.0) * 0.8 AS hybrid_score
 FROM t1
 FULL OUTER JOIN t2 ON t1.id = t2.id 
 ORDER BY hybrid_score DESC
 LIMIT 10;
 
--- Test full-text search separately
+-- Test full-text search separately using BM25
 SELECT 
     id,
     server_name,
     name,
     description,
-    description @@@ pgsearch.config('text:weather data') AS score
+    description @@@ pgsearch.config('text:weather data') AS bm25_score
 FROM apig_mcp_tools
 WHERE description @@@ pgsearch.config('text:weather data')
-ORDER BY score DESC
+ORDER BY bm25_score DESC
 LIMIT 5;
 
--- Test vector search separately
+-- Test vector search separately using cosine similarity
 SELECT 
     id,
     server_name,
     name,
     description,
-    cosine_similarity(vector, ARRAY[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]::real[]) AS score
+    cosine_similarity(vector, ARRAY[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]::real[]) AS similarity_score
 FROM apig_mcp_tools
 WHERE vector IS NOT NULL
 ORDER BY vector <-> ARRAY[0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]

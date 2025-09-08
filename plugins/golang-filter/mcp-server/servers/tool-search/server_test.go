@@ -34,14 +34,19 @@ func TestServer(t *testing.T) {
 
 	// Load configuration from environment variables or use defaults
 	config := map[string]any{
-		"dsn":          getEnvOrDefault("TEST_DSN", "host=localhost user=postgres password=password dbname=mcp_tools port=5432 sslmode=disable"),
-		"apiKey":       getEnvOrDefault("TEST_API_KEY", "your-dashscope-api-key"),
-		"baseURL":      getEnvOrDefault("TEST_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
-		"model":        getEnvOrDefault("TEST_MODEL", "text-embedding-v4"),
-		"dimensions":   1024,
-		"vectorWeight": 0.6,
-		"tableName":    getEnvOrDefault("TEST_TABLE_NAME", "apig_mcp_tools"),
-		"description":  "Test MCP Tools Search Server",
+		"vector": map[string]any{
+			"type":         "postgres",
+			"vectorWeight": 0.6,
+			"tableName":    getEnvOrDefault("TEST_TABLE_NAME", "apig_mcp_tools"),
+			"dsn":          getEnvOrDefault("TEST_DSN", "host=localhost user=postgres password=password dbname=mcp_tools port=5432 sslmode=disable"),
+		},
+		"embedding": map[string]any{
+			"apiKey":     getEnvOrDefault("TEST_API_KEY", "your-dashscope-api-key"),
+			"baseURL":    getEnvOrDefault("TEST_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
+			"model":      getEnvOrDefault("TEST_MODEL", "text-embedding-v4"),
+			"dimensions": 1024,
+		},
+		"description": "Test MCP Tools Search Server",
 	}
 
 	// Create configuration instance
@@ -57,7 +62,10 @@ func TestServer(t *testing.T) {
 	}
 
 	// Test database connection
-	dbClient := NewDBClient(config["dsn"].(string), config["tableName"].(string), make(chan struct{}))
+	vectorConfig := config["vector"].(map[string]any)
+	embeddingConfig := config["embedding"].(map[string]any)
+
+	dbClient := NewDBClient(vectorConfig["dsn"].(string), vectorConfig["tableName"].(string), make(chan struct{}))
 	if err := dbClient.Ping(); err != nil {
 		t.Logf("Database connection failed: %v", err)
 		t.Logf("Please ensure PostgreSQL is running and the database is accessible")
@@ -68,11 +76,11 @@ func TestServer(t *testing.T) {
 	// Test GetAllTools
 	t.Logf("\n=== Testing GetAllTools ===")
 	searchService := NewSearchService(dbClient, NewEmbeddingClient(
-		config["apiKey"].(string),
-		config["baseURL"].(string),
-		config["model"].(string),
-		config["dimensions"].(int),
-	), config["vectorWeight"].(float64), 1.0-config["vectorWeight"].(float64))
+		embeddingConfig["apiKey"].(string),
+		embeddingConfig["baseURL"].(string),
+		embeddingConfig["model"].(string),
+		embeddingConfig["dimensions"].(int),
+	), vectorConfig["vectorWeight"].(float64), 1.0-vectorConfig["vectorWeight"].(float64))
 
 	allTools, err := searchService.GetAllTools()
 	if err != nil {
@@ -148,12 +156,13 @@ func TestServer(t *testing.T) {
 
 	// Test configuration validation
 	t.Logf("\n=== Configuration Validation ===")
-	t.Logf("DSN: %s", config["dsn"])
-	t.Logf("Table Name: %s", config["tableName"])
-	t.Logf("Vector Weight: %f", config["vectorWeight"])
-	t.Logf("Text Weight: %f", 1.0-config["vectorWeight"].(float64))
-	t.Logf("Model: %s", config["model"])
-	t.Logf("Dimensions: %d", config["dimensions"])
+	t.Logf("DSN: %s", vectorConfig["dsn"])
+	t.Logf("Table Name: %s", vectorConfig["tableName"])
+	t.Logf("Vector Weight: %f", vectorConfig["vectorWeight"])
+	t.Logf("Text Weight: %f", 1.0-vectorConfig["vectorWeight"].(float64))
+	t.Logf("Model: %s", embeddingConfig["model"])
+	t.Logf("Dimensions: %d", embeddingConfig["dimensions"])
+	t.Logf("API Base URL: %s", embeddingConfig["baseURL"])
 
 	t.Logf("\n=== Test completed ===")
 }

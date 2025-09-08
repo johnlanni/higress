@@ -12,13 +12,16 @@ CREATE TABLE IF NOT EXISTS apig_mcp_tools (
     vector VECTOR(1024)  -- Requires pgvector extension
 );
 
--- Create full-text search index (using pgsearch)
-CREATE INDEX IF NOT EXISTS idx_tools_description_pgsearch 
-ON apig_mcp_tools USING gin(description gin_pgsearch_ops);
-
--- Create vector index
+-- Create vector index using ann method
 CREATE INDEX IF NOT EXISTS idx_tools_vector 
-ON apig_mcp_tools USING ivfflat (vector vector_cosine_ops) WITH (lists = 100);
+ON apig_mcp_tools USING ann(vector) WITH (dim = 1024, algorithm = hnswflat, distancemeasure = L2, vector_include = 0);
+
+-- Create full-text search index using pgsearch BM25
+CALL pgsearch.create_bm25(
+    index_name => 'idx_tools_description_bm25',
+    table_name => 'apig_mcp_tools',
+    text_fields => '{description: {}}'
+);
 
 -- Create composite indexes
 CREATE INDEX IF NOT EXISTS idx_tools_server_name 
