@@ -1,0 +1,10 @@
+{
+  "dsn": "host=localhost user=postgres password=password dbname=mcp_tools port=5432 sslmode=disable",
+  "apiKey": "your-dashscope-api-key",
+  "baseURL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "model": "text-embedding-v4",
+  "dimensions": 1024,
+  "vectorWeight": 0.6,
+  "tableName": "apig_mcp_tools",
+  "description": "MCP Tools Search Server"
+}
