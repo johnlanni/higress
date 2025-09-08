@@ -1,6 +1,6 @@
 {
   "vector": {
-    "type": "postgres",
+    "type": "adb-postgres",
     "vectorWeight": 0.5,
     "tableName": "apig_mcp_tools",
     "dsn": "host=localhost user=postgres password=password dbname=mcp_tools port=5432 sslmode=disable"

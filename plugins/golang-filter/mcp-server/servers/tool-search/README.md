@@ -15,17 +15,17 @@ Create the following table in PostgreSQL:
 
 ```sql
 -- Install required extensions
-CREATE EXTENSION IF NOT EXISTS vector;
+-- CREATE EXTENSION IF NOT EXISTS vector;
 CREATE EXTENSION IF NOT EXISTS pgsearch;
 
 -- Note: Table name is configurable via the tableName parameter
 CREATE TABLE apig_mcp_tools (
-    id SERIAL PRIMARY KEY,
+    id VARCHAR(255) PRIMARY KEY,
     server_name VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
     description TEXT,
-    metadata JSONB,
-    vector VECTOR(1024)  -- Requires pgvector extension
+    metadata TEXT,
+    vector real[]
 );
 
 -- Create vector index using ann method with HNSW algorithm
@@ -56,7 +56,7 @@ Configuration object for the `vector` field:
 
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
-| type | string | Yes | - | Vector database type (currently only "postgres" supported) |
+| type | string | Yes | - | Vector database type (currently only "adb-postgres" supported) |
 | dsn | string | Yes | - | PostgreSQL database connection string |
 | vectorWeight | float64 | No | 0.5 | Vector search weight (0-1), textWeight = 1 - vectorWeight |
 | tableName | string | No | apig_mcp_tools | Database table name |
@@ -77,7 +77,7 @@ Configuration object for the `embedding` field:
 ```json
 {
   "vector": {
-    "type": "postgres",
+    "type": "adb-postgres",
     "vectorWeight": 0.5,
     "tableName": "apig_mcp_tools",
     "dsn": "host=localhost user=postgres password=password dbname=mcp_tools port=5432 sslmode=disable"
@@ -146,13 +146,14 @@ Uses pgsearch extension's BM25 algorithm for advanced full-text search:
 
 ```sql
 SELECT 
-    description @@@ pgsearch.config('text:query_text') AS bm25_score
+    description @@@ pgsearch.config('description:query_text') AS bm25_score
 FROM apig_mcp_tools
-WHERE description @@@ pgsearch.config('text:query_text')
-ORDER BY bm25_score DESC
+ORDER BY bm25_score ASC
 ```
 
 BM25 provides state-of-the-art text ranking based on term frequency and document frequency.
+
+**Important for ADB PostgreSQL**: In ADB PostgreSQL, BM25 scores are negative values where smaller (more negative) values indicate higher relevance. Therefore, we use `ORDER BY score ASC` to get the most relevant results first. No WHERE clause is needed since all results have valid BM25 scores.
 
 ## Fallback Mechanism
 
@@ -164,10 +165,13 @@ When embedding generation fails, the system automatically falls back to text-onl
 
 ## Dependencies
 
-- PostgreSQL database
-- pgvector extension (for vector storage and similarity computation)
+- Alibaba Cloud ADB PostgreSQL database
 - pgsearch extension (for advanced full-text search)
 - OpenAI-compatible embedding API access (supports OpenAI, DashScope, Azure OpenAI, etc.)
+
+**Note**: This implementation is specifically designed for Alibaba Cloud ADB PostgreSQL, which uses:
+- Native `real[]` array type for vector storage
+- BM25 scoring with negative values (smaller values indicate higher relevance)
 
 ## Supported Embedding Services
 

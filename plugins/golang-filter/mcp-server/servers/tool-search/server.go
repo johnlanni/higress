@@ -75,6 +75,11 @@ func (c *ToolSearchConfig) parseVectorConfig(config map[string]any) error {
 		return errors.New("missing vector.type")
 	}
 
+	// Validate supported types
+	if c.Vector.Type != "adb-postgres" {
+		return fmt.Errorf("unsupported vector.type: %s, only 'adb-postgres' is supported", c.Vector.Type)
+	}
+
 	// Parse DSN (required)
 	if dsn, ok := config["dsn"].(string); ok {
 		c.Vector.DSN = dsn

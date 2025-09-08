@@ -24,12 +24,12 @@ type DBClient struct {
 
 // ToolRecord represents a tool record in the database
 type ToolRecord struct {
-	ID          int       `gorm:"primaryKey"`
-	ServerName  string    `gorm:"column:server_name"`
-	Name        string    `gorm:"column:name"`
-	Description string    `gorm:"column:description"`
-	Metadata    string    `gorm:"column:metadata;type:jsonb"`
-	Vector      []float32 `gorm:"column:vector;type:vector(1024)"`
+	ID          string     `gorm:"primaryKey"`
+	ServerName  string     `gorm:"column:server_name"`
+	Name        string     `gorm:"column:name"`
+	Description string     `gorm:"column:description"`
+	Metadata    string     `gorm:"column:metadata;type:text"`
+	Vector      *[]float32 `gorm:"column:vector;type:real[]"`
 }
 
 // NewDBClient creates a new DBClient instance
@@ -181,12 +181,11 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 				description,
 				metadata,
 				vector,
-				description @@@ pgsearch.config('text:%s') AS score,
+				description @@@ pgsearch.config('description:%s') AS score,
 				2 AS source
 			FROM %s
-			WHERE description @@@ pgsearch.config('text:%s')
-			ORDER BY score
-			LIMIT $2
+			ORDER BY score ASC
+			LIMIT %d
 		),
 		t2 AS (
 			SELECT
@@ -201,7 +200,7 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 			FROM %s
 			WHERE vector IS NOT NULL
 			ORDER BY vector <-> %s
-			LIMIT $2
+			LIMIT %d
 		)
 		SELECT 
 			COALESCE(t1.id, t2.id) as id,
@@ -210,14 +209,14 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 			COALESCE(t1.description, t2.description) as description,
 			COALESCE(t1.metadata, t2.metadata) as metadata,
 			COALESCE(t1.vector, t2.vector) as vector,
-			COALESCE(ABS(t1.score), 0.0) * $3 + COALESCE(t2.score, 0.0) * $4 AS hybrid_score
+			COALESCE(ABS(t1.score), 0.0) * $1 + COALESCE(t2.score, 0.0) * $2 AS hybrid_score
 		FROM t1
 		FULL OUTER JOIN t2 ON t1.id = t2.id 
 		ORDER BY hybrid_score DESC
-		LIMIT $2
-	`, query, c.tableName, query, vectorStr, c.tableName, vectorStr)
+			LIMIT %d
+	`, query, c.tableName, topK, vectorStr, c.tableName, vectorStr, topK, topK)
 
-	rows, err := c.db.Raw(sql, query, topK, textWeight, vectorWeight).Rows()
+	rows, err := c.db.Raw(sql, textWeight, vectorWeight).Rows()
 	if err := c.handleSQLError(err); err != nil {
 		return nil, err
 	}
@@ -264,16 +263,15 @@ func (c *DBClient) SearchToolsTextOnly(query string, topK int) ([]ToolRecord, er
 			description,
 			metadata,
 			vector,
-			description @@@ pgsearch.config('text:%s') AS score
+			description @@@ pgsearch.config('description:%s') AS score
 		FROM %s
-		WHERE description @@@ pgsearch.config('text:%s')
-		ORDER BY score DESC
-		LIMIT $1
-	`, query, c.tableName, query)
+		ORDER BY score ASC
+		LIMIT %d
+	`, query, c.tableName, topK)
 
 	api.LogDebugf("Executing text-only search SQL")
 
-	rows, err := c.db.Raw(sql, topK).Rows()
+	rows, err := c.db.Raw(sql).Rows()
 	if err := c.handleSQLError(err); err != nil {
 		api.LogErrorf("Text-only search SQL failed: %v", err)
 		return nil, err

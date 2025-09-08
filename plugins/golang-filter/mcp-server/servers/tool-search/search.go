@@ -147,5 +147,5 @@ func (s *SearchService) GetAllTools() (*ToolSearchResult, error) {
 		tools = append(tools, tool)
 	}
 
-	return s.convertRecordsToResult(records), nil
+	return &ToolSearchResult{Tools: tools}, nil
 }

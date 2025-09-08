@@ -6,6 +6,7 @@
 -- CREATE INDEX idx_tools_vector ON apig_mcp_tools USING ann(vector) WITH (dim = 1024, algorithm = hnswflat, distancemeasure = L2, vector_include = 0);
 -- Full-text search index using pgsearch BM25:
 -- CALL pgsearch.create_bm25(index_name => 'idx_tools_description_bm25', table_name => 'apig_mcp_tools', text_fields => '{description: {}}');
+-- Note: In pgsearch.config('field_name:query'), field_name must match the indexed field
 
 -- Example query: Search for tools related to "weather data"
 WITH t1 AS (
@@ -17,11 +18,10 @@ WITH t1 AS (
         description,
         metadata,
         vector,
-        description @@@ pgsearch.config('text:weather data') AS score,
+        description @@@ pgsearch.config('description:weather data') AS score,
         2 AS source
     FROM apig_mcp_tools
-    WHERE description @@@ pgsearch.config('text:weather data')
-    ORDER BY score DESC
+    ORDER BY score ASC
     LIMIT 10
 ),
 t2 AS (
@@ -54,7 +54,7 @@ SELECT
     COALESCE(ABS(t1.score), 0.0) * 0.2 + COALESCE(t2.score, 0.0) * 0.8 AS hybrid_score
 FROM t1
 FULL OUTER JOIN t2 ON t1.id = t2.id 
-ORDER BY hybrid_score DESC
+ORDER BY hybrid_score
 LIMIT 10;
 
 -- Test full-text search separately using BM25
@@ -63,10 +63,9 @@ SELECT
     server_name,
     name,
     description,
-    description @@@ pgsearch.config('text:weather data') AS bm25_score
+    description @@@ pgsearch.config('description:weather data') AS bm25_score
 FROM apig_mcp_tools
-WHERE description @@@ pgsearch.config('text:weather data')
-ORDER BY bm25_score DESC
+ORDER BY bm25_score ASC
 LIMIT 5;
 
 -- Test vector search separately using cosine similarity
