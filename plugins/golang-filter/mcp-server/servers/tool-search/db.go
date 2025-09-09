@@ -17,6 +17,7 @@ type DBClient struct {
 	db         *gorm.DB
 	dsn        string
 	tableName  string
+	userID     string
 	reconnect  chan struct{}
 	stop       chan struct{}
 	panicCount int32
@@ -30,13 +31,15 @@ type ToolRecord struct {
 	Description string     `gorm:"column:description"`
 	Metadata    string     `gorm:"column:metadata;type:text"`
 	Vector      *[]float32 `gorm:"column:vector;type:real[]"`
+	UserID      string     `gorm:"column:user_id"`
 }
 
 // NewDBClient creates a new DBClient instance
-func NewDBClient(dsn, tableName string, stop chan struct{}) *DBClient {
+func NewDBClient(dsn, tableName, userID string, stop chan struct{}) *DBClient {
 	client := &DBClient{
 		dsn:       dsn,
 		tableName: tableName,
+		userID:    userID,
 		reconnect: make(chan struct{}, 1),
 		stop:      stop,
 	}
@@ -171,6 +174,12 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 	}
 	vectorStr += "]::real[]"
 
+	// Build user_id filter clause if needed
+	var userFilter string
+	if c.userID != "" {
+		userFilter = fmt.Sprintf(" AND user_id = '%s'", c.userID)
+	}
+
 	// Build the hybrid search SQL query
 	sql := fmt.Sprintf(`
 		WITH t1 AS (
@@ -184,6 +193,7 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 				description @@@ pgsearch.config('description:%s') AS score,
 				2 AS source
 			FROM %s
+			WHERE 1=1%s
 			ORDER BY score ASC
 			LIMIT %d
 		),
@@ -198,7 +208,7 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 				cosine_similarity(vector, %s) AS score,
 				1 AS source
 			FROM %s
-			WHERE vector IS NOT NULL
+			WHERE vector IS NOT NULL%s
 			ORDER BY vector <-> %s
 			LIMIT %d
 		)
@@ -214,7 +224,7 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 		FULL OUTER JOIN t2 ON t1.id = t2.id 
 		ORDER BY hybrid_score DESC
 			LIMIT %d
-	`, query, c.tableName, topK, vectorStr, c.tableName, vectorStr, topK, topK)
+	`, query, c.tableName, userFilter, topK, vectorStr, c.tableName, userFilter, vectorStr, topK, topK)
 
 	rows, err := c.db.Raw(sql, textWeight, vectorWeight).Rows()
 	if err := c.handleSQLError(err); err != nil {
@@ -254,6 +264,12 @@ func (c *DBClient) SearchToolsTextOnly(query string, topK int) ([]ToolRecord, er
 		return nil, err
 	}
 
+	// Build user_id filter clause if needed
+	var userFilter string
+	if c.userID != "" {
+		userFilter = fmt.Sprintf(" WHERE user_id = '%s'", c.userID)
+	}
+
 	// Build text-only search SQL query
 	sql := fmt.Sprintf(`
 		SELECT 
@@ -264,10 +280,10 @@ func (c *DBClient) SearchToolsTextOnly(query string, topK int) ([]ToolRecord, er
 			metadata,
 			vector,
 			description @@@ pgsearch.config('description:%s') AS score
-		FROM %s
+		FROM %s%s
 		ORDER BY score ASC
 		LIMIT %d
-	`, query, c.tableName, topK)
+	`, query, c.tableName, userFilter, topK)
 
 	api.LogDebugf("Executing text-only search SQL")
 
@@ -311,7 +327,14 @@ func (c *DBClient) GetAllTools() ([]ToolRecord, error) {
 	}
 
 	var tools []ToolRecord
-	err := c.db.Table(c.tableName).Find(&tools).Error
+	query := c.db.Table(c.tableName)
+
+	// Add user_id filter if userID is provided (for ADB PostgreSQL)
+	if c.userID != "" {
+		query = query.Where("user_id = ?", c.userID)
+	}
+
+	err := query.Find(&tools).Error
 	if err := c.handleSQLError(err); err != nil {
 		return nil, err
 	}

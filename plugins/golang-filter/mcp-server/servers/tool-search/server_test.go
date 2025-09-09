@@ -35,13 +35,13 @@ func TestServer(t *testing.T) {
 	// Load configuration from environment variables or use defaults
 	config := map[string]any{
 		"vector": map[string]any{
-			"type":         "postgres",
+			"type":         "adb-postgres",
 			"vectorWeight": 0.6,
 			"tableName":    getEnvOrDefault("TEST_TABLE_NAME", "apig_mcp_tools"),
 			"dsn":          getEnvOrDefault("TEST_DSN", "host=localhost user=postgres password=password dbname=mcp_tools port=5432 sslmode=disable"),
 		},
 		"embedding": map[string]any{
-			"apiKey":     getEnvOrDefault("TEST_API_KEY", "your-dashscope-api-key"),
+			"apiKey":     getEnvOrDefault("TEST_API_KEY", "xxxx"),
 			"baseURL":    getEnvOrDefault("TEST_BASE_URL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
 			"model":      getEnvOrDefault("TEST_MODEL", "text-embedding-v4"),
 			"dimensions": 1024,
@@ -65,7 +65,7 @@ func TestServer(t *testing.T) {
 	vectorConfig := config["vector"].(map[string]any)
 	embeddingConfig := config["embedding"].(map[string]any)
 
-	dbClient := NewDBClient(vectorConfig["dsn"].(string), vectorConfig["tableName"].(string), make(chan struct{}))
+	dbClient := NewDBClient(vectorConfig["dsn"].(string), vectorConfig["tableName"].(string), "", make(chan struct{}))
 	if err := dbClient.Ping(); err != nil {
 		t.Logf("Database connection failed: %v", err)
 		t.Logf("Please ensure PostgreSQL is running and the database is accessible")
@@ -105,6 +105,7 @@ func TestServer(t *testing.T) {
 		"database query",
 		"file operations",
 		"HTTP requests",
+		"library documents",
 	}
 
 	for _, query := range testQueries {
