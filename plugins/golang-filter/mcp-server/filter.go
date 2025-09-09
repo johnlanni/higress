@@ -3,7 +3,6 @@ package mcp_server
 import (
 	"net/http"
 	"net/http/httptest"
-	"strings"
 
 	"github.com/alibaba/higress/plugins/golang-filter/mcp-session/common"
 	"github.com/envoyproxy/envoy/contrib/golang/common/go/api"
@@ -27,11 +26,8 @@ func (f *filter) DecodeHeaders(header api.RequestHeaderMap, endStream bool) api.
 		return api.Continue
 	}
 	f.path = url.ParsedURL.Path
-	f.host = url.ParsedURL.Host
-	argStart := strings.Index(f.path, "?")
-	if argStart > 0 {
-		f.path = f.path[0:argStart]
-	}
+	f.host = url.Host
+
 	for _, server := range f.config.servers {
 		if common.MatchDomainList(f.host, server.DomainList) && f.path == server.BaseServer.GetMessageEndpoint() {
 			if url.Method != http.MethodPost {
