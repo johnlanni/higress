@@ -28,9 +28,14 @@ func HandleToolSearch(searchService *SearchService) common.ToolHandlerFunc {
 		// Get topK parameter (optional, default to 10)
 		topK := 10
 		if topKVal, ok := arguments["topK"]; ok {
-			if topKFloat, ok := topKVal.(float64); ok {
-				topK = int(topKFloat)
-			} else {
+			switch v := topKVal.(type) {
+			case float64:
+				topK = int(v)
+			case int:
+				topK = v
+			case int64:
+				topK = int(v)
+			default:
 				api.LogWarnf("Invalid topK argument type: %T, using default: %d", topKVal, topK)
 			}
 		}

@@ -3,6 +3,7 @@ package toolsearch
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync/atomic"
 	"time"
 
@@ -25,13 +26,12 @@ type DBClient struct {
 
 // ToolRecord represents a tool record in the database
 type ToolRecord struct {
-	ID          string     `gorm:"primaryKey"`
-	ServerName  string     `gorm:"column:server_name"`
-	Name        string     `gorm:"column:name"`
-	Description string     `gorm:"column:description"`
-	Metadata    string     `gorm:"column:metadata;type:text"`
-	Vector      *[]float32 `gorm:"column:vector;type:real[]"`
-	UserID      string     `gorm:"column:user_id"`
+	ID          string `gorm:"primaryKey"`
+	ServerName  string `gorm:"column:server_name"`
+	Name        string `gorm:"column:name"`
+	Description string `gorm:"column:description"`
+	Metadata    string `gorm:"column:metadata;type:text"`
+	UserID      string `gorm:"column:user_id"`
 }
 
 // NewDBClient creates a new DBClient instance
@@ -164,24 +164,19 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 		return nil, err
 	}
 
-	// Convert vector to PostgreSQL array format
-	vectorStr := "ARRAY["
+	// Convert vector to string array format for PostgreSQL
+	vectorParts := make([]string, len(vector))
 	for i, v := range vector {
-		if i > 0 {
-			vectorStr += ","
-		}
-		vectorStr += fmt.Sprintf("%f", v)
+		vectorParts[i] = fmt.Sprintf("%f", v)
 	}
-	vectorStr += "]::real[]"
+	vectorStr := "{" + strings.Join(vectorParts, ",") + "}"
 
-	// Build user_id filter clause if needed
-	var userFilter string
+	// Build the hybrid search SQL query with parameterized queries
+	var sql string
+	var args []interface{}
+
 	if c.userID != "" {
-		userFilter = fmt.Sprintf(" AND user_id = '%s'", c.userID)
-	}
-
-	// Build the hybrid search SQL query
-	sql := fmt.Sprintf(`
+		sql = `
 		WITH t1 AS (
 			SELECT
 				id,
@@ -189,13 +184,12 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 				name,
 				description,
 				metadata,
-				vector,
-				description @@@ pgsearch.config('description:%s') AS score,
+				description @@@ pgsearch.config(CONCAT('description:', ?::text)) AS score,
 				2 AS source
-			FROM %s
-			WHERE 1=1%s
+			FROM ` + c.tableName + `
+			WHERE user_id = ?
 			ORDER BY score ASC
-			LIMIT %d
+			LIMIT ?
 		),
 		t2 AS (
 			SELECT
@@ -204,13 +198,12 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 				name,
 				description,
 				metadata,
-				vector,
-				cosine_similarity(vector, %s) AS score,
+				cosine_similarity(vector, ?::real[]) AS score,
 				1 AS source
-			FROM %s
-			WHERE vector IS NOT NULL%s
-			ORDER BY vector <-> %s
-			LIMIT %d
+			FROM ` + c.tableName + `
+			WHERE vector IS NOT NULL AND user_id = ?
+			ORDER BY vector <-> ?
+			LIMIT ?
 		)
 		SELECT 
 			COALESCE(t1.id, t2.id) as id,
@@ -218,15 +211,61 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 			COALESCE(t1.name, t2.name) as name,
 			COALESCE(t1.description, t2.description) as description,
 			COALESCE(t1.metadata, t2.metadata) as metadata,
-			COALESCE(t1.vector, t2.vector) as vector,
-			COALESCE(ABS(t1.score), 0.0) * $1 + COALESCE(t2.score, 0.0) * $2 AS hybrid_score
+			COALESCE(ABS(t1.score), 0.0) * ? + COALESCE(t2.score, 0.0) * ? AS hybrid_score
 		FROM t1
 		FULL OUTER JOIN t2 ON t1.id = t2.id 
 		ORDER BY hybrid_score DESC
-			LIMIT %d
-	`, query, c.tableName, userFilter, topK, vectorStr, c.tableName, userFilter, vectorStr, topK, topK)
+		LIMIT ?`
+		args = []interface{}{query, c.userID, topK, vectorStr, c.userID, vectorStr, topK, textWeight, vectorWeight, topK}
+	} else {
+		sql = `
+		WITH t1 AS (
+			SELECT
+				id,
+				server_name,
+				name,
+				description,
+				metadata,
+				description @@@ pgsearch.config(CONCAT('description:', ?::text)) AS score,
+				2 AS source
+			FROM ` + c.tableName + `
+			WHERE 1=1
+			ORDER BY score ASC
+			LIMIT ?
+		),
+		t2 AS (
+			SELECT
+				id,
+				server_name,
+				name,
+				description,
+				metadata,
+				cosine_similarity(vector, ?::real[]) AS score,
+				1 AS source
+			FROM ` + c.tableName + `
+			WHERE vector IS NOT NULL
+			ORDER BY vector <-> ?
+			LIMIT ?
+		)
+		SELECT 
+			COALESCE(t1.id, t2.id) as id,
+			COALESCE(t1.server_name, t2.server_name) as server_name,
+			COALESCE(t1.name, t2.name) as name,
+			COALESCE(t1.description, t2.description) as description,
+			COALESCE(t1.metadata, t2.metadata) as metadata,
+			COALESCE(ABS(t1.score), 0.0) * ? + COALESCE(t2.score, 0.0) * ? AS hybrid_score
+		FROM t1
+		FULL OUTER JOIN t2 ON t1.id = t2.id 
+		ORDER BY hybrid_score DESC
+		LIMIT ?`
+		args = []interface{}{query, topK, vectorStr, vectorStr, topK, textWeight, vectorWeight, topK}
+	}
 
-	rows, err := c.db.Raw(sql, textWeight, vectorWeight).Rows()
+	api.LogInfof("Executing hybrid search SQL query for: '%s'", query)
+	api.LogDebugf("SQL: %s", sql)
+	api.LogDebugf("Args: %v", args)
+
+	rows, err := c.db.Raw(sql, args...).Rows()
 	if err := c.handleSQLError(err); err != nil {
 		return nil, err
 	}
@@ -243,7 +282,6 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 			&record.Name,
 			&record.Description,
 			&record.Metadata,
-			&record.Vector,
 			&hybridScore,
 		)
 		if err != nil {
@@ -253,6 +291,7 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 		results = append(results, record)
 	}
 
+	api.LogInfof("Hybrid search completed, found %d results", len(results))
 	return results, nil
 }
 
@@ -264,30 +303,44 @@ func (c *DBClient) SearchToolsTextOnly(query string, topK int) ([]ToolRecord, er
 		return nil, err
 	}
 
-	// Build user_id filter clause if needed
-	var userFilter string
-	if c.userID != "" {
-		userFilter = fmt.Sprintf(" WHERE user_id = '%s'", c.userID)
-	}
+	// Build text-only search SQL query with parameterized queries
+	var sql string
+	var args []interface{}
 
-	// Build text-only search SQL query
-	sql := fmt.Sprintf(`
+	if c.userID != "" {
+		sql = `
 		SELECT 
 			id,
 			server_name,
 			name,
 			description,
 			metadata,
-			vector,
-			description @@@ pgsearch.config('description:%s') AS score
-		FROM %s%s
+			description @@@ pgsearch.config(CONCAT('description:', ?)) AS score
+		FROM ` + c.tableName + `
+		WHERE user_id = ?
 		ORDER BY score ASC
-		LIMIT %d
-	`, query, c.tableName, userFilter, topK)
+		LIMIT ?`
+		args = []interface{}{query, c.userID, topK}
+	} else {
+		sql = `
+		SELECT 
+			id,
+			server_name,
+			name,
+			description,
+			metadata,
+			description @@@ pgsearch.config(CONCAT('description:', ?)) AS score
+		FROM ` + c.tableName + `
+		ORDER BY score ASC
+		LIMIT ?`
+		args = []interface{}{query, topK}
+	}
 
-	api.LogDebugf("Executing text-only search SQL")
+	api.LogInfof("Executing text-only search SQL query for: '%s'", query)
+	api.LogDebugf("SQL: %s", sql)
+	api.LogDebugf("Args: %v", args)
 
-	rows, err := c.db.Raw(sql).Rows()
+	rows, err := c.db.Raw(sql, args...).Rows()
 	if err := c.handleSQLError(err); err != nil {
 		api.LogErrorf("Text-only search SQL failed: %v", err)
 		return nil, err
@@ -305,7 +358,6 @@ func (c *DBClient) SearchToolsTextOnly(query string, topK int) ([]ToolRecord, er
 			&record.Name,
 			&record.Description,
 			&record.Metadata,
-			&record.Vector,
 			&score,
 		)
 		if err != nil {
@@ -316,7 +368,7 @@ func (c *DBClient) SearchToolsTextOnly(query string, topK int) ([]ToolRecord, er
 		results = append(results, record)
 	}
 
-	api.LogDebugf("Text-only search found %d results", len(results))
+	api.LogInfof("Text-only search completed, found %d results", len(results))
 	return results, nil
 }
 
@@ -326,12 +378,15 @@ func (c *DBClient) GetAllTools() ([]ToolRecord, error) {
 		return nil, err
 	}
 
+	api.LogInfof("Executing GetAllTools query from table: %s", c.tableName)
+
 	var tools []ToolRecord
 	query := c.db.Table(c.tableName)
 
 	// Add user_id filter if userID is provided (for ADB PostgreSQL)
 	if c.userID != "" {
 		query = query.Where("user_id = ?", c.userID)
+		api.LogDebugf("Added user_id filter: %s", c.userID)
 	}
 
 	err := query.Find(&tools).Error
@@ -339,5 +394,6 @@ func (c *DBClient) GetAllTools() ([]ToolRecord, error) {
 		return nil, err
 	}
 
+	api.LogInfof("GetAllTools query completed, found %d tools", len(tools))
 	return tools, nil
 }
