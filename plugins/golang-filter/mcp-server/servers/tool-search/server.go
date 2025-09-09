@@ -20,7 +20,7 @@ type VectorConfig struct {
 	VectorWeight float64 `json:"vectorWeight"`
 	TableName    string  `json:"tableName"`
 	DSN          string  `json:"dsn"`
-	UserID       string  `json:"userId"`
+	GatewayID    string  `json:"gatewayId"`
 }
 
 type EmbeddingConfig struct {
@@ -101,9 +101,9 @@ func (c *ToolSearchConfig) parseVectorConfig(config map[string]any) error {
 		c.Vector.TableName = "apig_mcp_tools"
 	}
 
-	// Parse userId (optional for ADB PostgreSQL)
-	if userID, ok := config["userId"].(string); ok {
-		c.Vector.UserID = userID
+	// Parse gatewayId (optional for ADB PostgreSQL)
+	if gatewayID, ok := config["gatewayId"].(string); ok {
+		c.Vector.GatewayID = gatewayID
 	}
 
 	return nil
@@ -149,7 +149,7 @@ func (c *ToolSearchConfig) NewServer(serverName string) (*common.MCPServer, erro
 	)
 
 	// Create database client
-	dbClient := NewDBClient(c.Vector.DSN, c.Vector.TableName, c.Vector.UserID, mcpServer.GetDestoryChannel())
+	dbClient := NewDBClient(c.Vector.DSN, c.Vector.TableName, c.Vector.GatewayID, mcpServer.GetDestoryChannel())
 
 	// Create embedding client
 	embeddingClient := NewEmbeddingClient(c.Embedding.APIKey, c.Embedding.BaseURL, c.Embedding.Model, c.Embedding.Dimensions)

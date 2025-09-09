@@ -18,7 +18,7 @@ type DBClient struct {
 	db         *gorm.DB
 	dsn        string
 	tableName  string
-	userID     string
+	gatewayID  string
 	reconnect  chan struct{}
 	stop       chan struct{}
 	panicCount int32
@@ -31,15 +31,15 @@ type ToolRecord struct {
 	Name        string `gorm:"column:name"`
 	Description string `gorm:"column:description"`
 	Metadata    string `gorm:"column:metadata;type:text"`
-	UserID      string `gorm:"column:user_id"`
+	GatewayID   string `gorm:"column:gateway_id"`
 }
 
 // NewDBClient creates a new DBClient instance
-func NewDBClient(dsn, tableName, userID string, stop chan struct{}) *DBClient {
+func NewDBClient(dsn, tableName, gatewayID string, stop chan struct{}) *DBClient {
 	client := &DBClient{
 		dsn:       dsn,
 		tableName: tableName,
-		userID:    userID,
+		gatewayID: gatewayID,
 		reconnect: make(chan struct{}, 1),
 		stop:      stop,
 	}
@@ -175,7 +175,7 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 	var sql string
 	var args []interface{}
 
-	if c.userID != "" {
+	if c.gatewayID != "" {
 		sql = `
 		WITH t1 AS (
 			SELECT
@@ -187,7 +187,7 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 				description @@@ pgsearch.config(CONCAT('description:', ?::text)) AS score,
 				2 AS source
 			FROM ` + c.tableName + `
-			WHERE user_id = ?
+			WHERE gateway_id = ?
 			ORDER BY score ASC
 			LIMIT ?
 		),
@@ -201,7 +201,7 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 				cosine_similarity(vector, ?::real[]) AS score,
 				1 AS source
 			FROM ` + c.tableName + `
-			WHERE vector IS NOT NULL AND user_id = ?
+			WHERE vector IS NOT NULL AND gateway_id = ?
 			ORDER BY vector <-> ?
 			LIMIT ?
 		)
@@ -216,7 +216,7 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 		FULL OUTER JOIN t2 ON t1.id = t2.id 
 		ORDER BY hybrid_score DESC
 		LIMIT ?`
-		args = []interface{}{query, c.userID, topK, vectorStr, c.userID, vectorStr, topK, textWeight, vectorWeight, topK}
+		args = []interface{}{query, c.gatewayID, topK, vectorStr, c.gatewayID, vectorStr, topK, textWeight, vectorWeight, topK}
 	} else {
 		sql = `
 		WITH t1 AS (
@@ -307,7 +307,7 @@ func (c *DBClient) SearchToolsTextOnly(query string, topK int) ([]ToolRecord, er
 	var sql string
 	var args []interface{}
 
-	if c.userID != "" {
+	if c.gatewayID != "" {
 		sql = `
 		SELECT 
 			id,
@@ -317,10 +317,10 @@ func (c *DBClient) SearchToolsTextOnly(query string, topK int) ([]ToolRecord, er
 			metadata,
 			description @@@ pgsearch.config(CONCAT('description:', ?)) AS score
 		FROM ` + c.tableName + `
-		WHERE user_id = ?
+		WHERE gateway_id = ?
 		ORDER BY score ASC
 		LIMIT ?`
-		args = []interface{}{query, c.userID, topK}
+		args = []interface{}{query, c.gatewayID, topK}
 	} else {
 		sql = `
 		SELECT 
@@ -383,10 +383,10 @@ func (c *DBClient) GetAllTools() ([]ToolRecord, error) {
 	var tools []ToolRecord
 	query := c.db.Table(c.tableName)
 
-	// Add user_id filter if userID is provided (for ADB PostgreSQL)
-	if c.userID != "" {
-		query = query.Where("user_id = ?", c.userID)
-		api.LogDebugf("Added user_id filter: %s", c.userID)
+	// Add gateway_id filter if gatewayID is provided (for ADB PostgreSQL)
+	if c.gatewayID != "" {
+		query = query.Where("gateway_id = ?", c.gatewayID)
+		api.LogDebugf("Added gateway_id filter: %s", c.gatewayID)
 	}
 
 	err := query.Find(&tools).Error
