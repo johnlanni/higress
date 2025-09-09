@@ -213,14 +213,9 @@ func (s *SSEServer) HandleMessage(w http.ResponseWriter, r *http.Request, body j
 	var status int
 	// Only send response if there is one (not for notifications)
 	if response != nil {
-		if sessionID != "" {
-			w.WriteHeader(http.StatusAccepted)
-			status = http.StatusAccepted
-		} else {
-			// support streamable http
-			w.WriteHeader(http.StatusOK)
-			status = http.StatusOK
-		}
+		// support streamable http
+		w.WriteHeader(http.StatusOK)
+		status = http.StatusOK
 		// Send HTTP response
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(response)

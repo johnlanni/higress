@@ -145,7 +145,6 @@ func (c *ToolSearchConfig) NewServer(serverName string) (*common.MCPServer, erro
 	mcpServer := common.NewMCPServer(
 		serverName,
 		Version,
-		common.WithInstructions(fmt.Sprintf("This is a tool search server: %s", c.description)),
 	)
 
 	// Create database client
