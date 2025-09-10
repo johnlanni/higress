@@ -229,7 +229,6 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 				description @@@ pgsearch.config(CONCAT('description:', ?::text)) AS score,
 				2 AS source
 			FROM ` + c.tableName + `
-			WHERE 1=1
 			ORDER BY score ASC
 			LIMIT ?
 		),
