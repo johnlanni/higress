@@ -184,7 +184,8 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 				name,
 				description,
 				metadata,
-				description @@@ pgsearch.config(CONCAT('description:', ?::text)) AS score,
+				description @@@ pgsearch.config(
+				pgsearch.tokenizer_terms('description', ?::text, pgsearch.tokenizer('jieba'), 'OR')) AS score,
 				2 AS source
 			FROM ` + c.tableName + `
 			WHERE gateway_id = ?
@@ -226,7 +227,8 @@ func (c *DBClient) SearchTools(query string, vector []float32, topK int, vectorW
 				name,
 				description,
 				metadata,
-				description @@@ pgsearch.config(CONCAT('description:', ?::text)) AS score,
+				description @@@ pgsearch.config(
+				pgsearch.tokenizer_terms('description', ?::text, pgsearch.tokenizer('jieba'), 'OR')) AS score,
 				2 AS source
 			FROM ` + c.tableName + `
 			ORDER BY score ASC
@@ -314,7 +316,8 @@ func (c *DBClient) SearchToolsTextOnly(query string, topK int) ([]ToolRecord, er
 			name,
 			description,
 			metadata,
-			description @@@ pgsearch.config(CONCAT('description:', ?)) AS score
+			description @@@ pgsearch.config(
+			pgsearch.tokenizer_terms('description', ?::text, pgsearch.tokenizer('jieba'), 'OR')) AS score
 		FROM ` + c.tableName + `
 		WHERE gateway_id = ?
 		ORDER BY score ASC
@@ -328,7 +331,8 @@ func (c *DBClient) SearchToolsTextOnly(query string, topK int) ([]ToolRecord, er
 			name,
 			description,
 			metadata,
-			description @@@ pgsearch.config(CONCAT('description:', ?)) AS score
+			description @@@ pgsearch.config(
+			pgsearch.tokenizer_terms('description', ?::text, pgsearch.tokenizer('jieba'), 'OR')) AS score
 		FROM ` + c.tableName + `
 		ORDER BY score ASC
 		LIMIT ?`
