@@ -52,6 +52,55 @@ See [references/annotation-mapping.md](references/annotation-mapping.md) for the
 
 For these, check [references/builtin-plugins.md](references/builtin-plugins.md) first - Higress may already have a plugin!
 
+#### TLS Version Control and Ciphers
+
+Higress supports TLS configuration through annotations similar to Nginx:
+
+```yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    higress.io/tls-min-protocol-version: "TLSv1.2"
+    higress.io/tls-max-protocol-version: "TLSv1.3"
+    higress.io/ssl-cipher: "ECDHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES128-GCM-SHA256"
+spec:
+  ...
+```
+
+**Nginx → Higress mapping:**
+
+| Nginx Annotation | Higress Annotation | Notes |
+|------------------|-------------------|-------|
+| `nginx.ingress.kubernetes.io/ssl-protocols: "TLSv1.2 TLSv1.3"` | `higress.io/tls-min-protocol-version: "TLSv1.2"` + `higress.io/tls-max-protocol-version: "TLSv1.3"` | Specify min and max versions separately |
+| `nginx.ingress.kubernetes.io/ssl-ciphers: "..."` | `higress.io/ssl-cipher: "..."` | Cipher suite configuration is identical |
+
+### Phase 2B: Snippet Function Migration Strategy (⚠️ Important)
+
+#### Key Warning: Snippet Functions Not Supported
+
+Higress **does not support** the following Nginx annotations; if present, they will be **silently ignored**, causing functionality loss:
+
+- `nginx.ingress.kubernetes.io/server-snippet`
+- `nginx.ingress.kubernetes.io/configuration-snippet`
+- `nginx.ingress.kubernetes.io/http-snippet`
+
+#### Identifying and Evaluating Snippets
+
+```bash
+# Find all Ingresses using snippets
+kubectl get ingress -A -o yaml | grep -B5 "snippet"
+
+# Count snippet usage
+kubectl get ingress -A -o yaml | grep "snippet" | wc -l
+```
+
+#### Migration Solution: Use WasmPlugin
+
+Higress provides WASM plugins to replace Nginx snippet functionality. The following are 4 real-world scenarios tested and verified:
+
+**See [references/MIGRATION_SAFE_STRATEGY.md](references/MIGRATION_SAFE_STRATEGY.md) for detailed safe migration strategy and [references/annotation-compatibility-matrix.md](references/annotation-compatibility-matrix.md) for complete annotation compatibility matrix.**
+
 ### Phase 3: Higress Installation (Parallel with nginx)
 
 Higress natively supports `nginx.ingress.kubernetes.io/*` annotations. Install Higress **alongside** nginx for safe parallel testing.
