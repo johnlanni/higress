@@ -2,7 +2,7 @@
 
 Higress のハッキングに興味がある場合は、温かく歓迎します。まず、このような意欲を非常に奨励します。そして、以下は貢献ガイドのリストです。
 
-[[中文](./CONTRIBUTING.md)] | [[English Contributing Document](./CONTRIBUTING_EN.md)]
+[[中文](./CONTRIBUTING_CN.md)] | [[English Contributing Document](./CONTRIBUTING_EN.md)]
 
 ## トピック
 
