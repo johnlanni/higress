@@ -389,6 +389,8 @@ func sendUnauthorizedResponse(message string) types.Action {
 }
 
 func setConsumerHeader(name string) {
+	// Replace rather than append: a client-supplied identity must never survive.
+	_ = proxywasm.RemoveHttpRequestHeader(consumerHeader)
 	_ = proxywasm.AddHttpRequestHeader(consumerHeader, name)
 }
 
