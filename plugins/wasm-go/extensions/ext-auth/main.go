@@ -76,7 +76,7 @@ func onHttpRequestHeaders(ctx wrapper.HttpContext, config config.ExtAuthConfig) 
 
 	// If withRequestBody is true AND the HTTP request contains a request body,
 	// it will be handled in the onHttpRequestBody phase.
-	if wrapper.HasRequestBody() && config.HttpService.AuthorizationRequest.WithRequestBody {
+	if ctx.HasRequestBody() && config.HttpService.AuthorizationRequest.WithRequestBody {
 		ctx.SetRequestBodyBufferLimit(config.HttpService.AuthorizationRequest.MaxRequestBodyBytes)
 		// The request has a body and requires delaying the header transmission until a cache miss occurs,
 		// at which point the header should be sent.

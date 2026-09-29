@@ -425,6 +425,39 @@ func TestBodyValidation_HeaderStageReturnsHeaderStopIteration(t *testing.T) {
 	})
 }
 
+// The deprecated header heuristic reported no body when content-length,
+// content-type and transfer-encoding were all absent, so a body delivered as
+// HTTP/2 DATA frames skipped digest validation. ctx.HasRequestBody() keys off
+// endOfStream instead, which the harness leaves false unless told otherwise.
+func TestBodyValidation_BodyWithoutContentHeadersStillPauses(t *testing.T) {
+	test.RunTest(t, func(t *testing.T) {
+		host, status := test.NewTestHost(createConfig(
+			[]map[string]interface{}{{"name": "c1", "access_key": "ak1", "secret_key": "sk1"}},
+			map[string]interface{}{
+				"global_auth":           true,
+				"validate_request_body": true,
+			},
+		))
+		defer host.Reset()
+		require.Equal(t, types.OnPluginStartStatusOK, status)
+
+		body := []byte(`{"hello":"world"}`)
+		digest := calculateBodyDigest(body)
+		d := gmt()
+		ah := authHeaderRequestTargetDate("ak1", "sk1", "hmac-sha256", "POST", "/p", d)
+		action := host.CallOnHttpRequestHeaders([][2]string{
+			{":authority", "e.com"}, {":path", "/p"}, {":method", "POST"},
+			{"authorization", ah}, {"date", d},
+			{"digest", digest},
+		})
+		require.Equal(t, types.ActionPause, action,
+			"a body following the header phase must be validated even without content headers")
+
+		require.Equal(t, types.ActionContinue, host.CallOnHttpRequestBody(body))
+		require.Nil(t, host.GetLocalResponse())
+	})
+}
+
 // === Anonymous consumer fallback for malformed Authorization =============
 
 func TestAnonymousConsumer_AppliedWhenAuthorizationCannotBeParsed(t *testing.T) {
