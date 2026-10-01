@@ -215,11 +215,11 @@ jobs:
         if: ${{ !inputs.dry_run }}
         env:
           REGISTRY: ${{ vars.PLUGIN_PUBLIC_REGISTRY }}
-          REGISTRY_USERNAME: ${{ secrets.PRODUCTION_REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ secrets.PRODUCTION_REGISTRY_PASSWORD }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
           CANDIDATE_REGISTRY: ${{ vars.PLUGIN_CANDIDATE_REGISTRY }}
-          CANDIDATE_USERNAME: ${{ secrets.CANDIDATE_REGISTRY_USERNAME }}
-          CANDIDATE_PASSWORD: ${{ secrets.CANDIDATE_REGISTRY_PASSWORD }}
+          CANDIDATE_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          CANDIDATE_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
           SNAPSHOT_PATH: ${{ inputs.snapshot_path }}
           SNAPSHOT_SHA256: ${{ inputs.snapshot_sha256 }}
           SOURCE_COMMIT: ${{ inputs.source_commit }}

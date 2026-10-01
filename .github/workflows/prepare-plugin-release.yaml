@@ -173,8 +173,8 @@ jobs:
           PREVIOUS: ${{ inputs.previous_snapshot }}
           BOOTSTRAP_BASE: ${{ inputs.bootstrap_comparison_base }}
           CANDIDATE_REGISTRY: ${{ vars.PLUGIN_CANDIDATE_REGISTRY }}
-          REGISTRY_USERNAME: ${{ secrets.CANDIDATE_REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ secrets.CANDIDATE_REGISTRY_PASSWORD }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: |
           set -euo pipefail
           (cd tools/plugin-release && go run . validate-catalog --root ../.. --catalog ../../plugins/release/catalog.json)
@@ -226,8 +226,8 @@ jobs:
         if: ${{ !inputs.dry_run }}
         env:
           CANDIDATE_REGISTRY: ${{ vars.PLUGIN_CANDIDATE_REGISTRY }}
-          REGISTRY_USERNAME: ${{ secrets.CANDIDATE_REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ secrets.CANDIDATE_REGISTRY_PASSWORD }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
           GATEWAY_VERSION: ${{ inputs.gateway_version }}
         run: |
           set -euo pipefail
