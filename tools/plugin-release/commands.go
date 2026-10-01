@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"sort"
 	"strings"
+	"time"
 )
 
 var (
@@ -1198,10 +1199,28 @@ func runORAS(args ...string) ([]byte, string, error) {
 	return output, stderr.String(), err
 }
 
+// transientORASTransportPattern matches transport-level ORAS failures
+// (connection resets and timeouts seen between GitHub runners and ACR).
+// Registry responses such as 404 absence evidence or authorization refusals
+// are semantic and must reach callers unchanged, so they are never retried.
+var transientORASTransportPattern = regexp.MustCompile(`connection reset by peer|connection refused|context deadline exceeded|i/o timeout|Client\.Timeout exceeded|broken pipe|unexpected EOF|no route to host|network is unreachable|TLS handshake timeout|proxyconnect`)
+
 func runORASManifestFetch(operation string, args ...string) ([]byte, error) {
-	output, stderr, err := orasRunner(args...)
-	if err == nil {
-		return output, nil
+	const attempts = 4
+	var output []byte
+	var stderr string
+	var err error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		if attempt > 1 {
+			time.Sleep(2 * time.Duration(attempt-1) * time.Second)
+		}
+		output, stderr, err = orasRunner(args...)
+		if err == nil {
+			return output, nil
+		}
+		if attempt == attempts || !transientORASTransportPattern.MatchString(stderr+"\n"+err.Error()) {
+			break
+		}
 	}
 	if detail := sanitizeCommandStderr(stderr); detail != "" {
 		return nil, fmt.Errorf("%s failed: %w: %s", operation, err, detail)
