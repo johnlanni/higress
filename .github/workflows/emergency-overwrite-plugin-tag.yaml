@@ -283,8 +283,8 @@ jobs:
           REGISTRY: ${{ needs.validate.outputs.public_registry }}
           REPOSITORY: ${{ needs.validate.outputs.public_repository }}
           CONFIGURED_REGISTRY: ${{ vars.PLUGIN_PUBLIC_REGISTRY }}
-          REGISTRY_USERNAME: ${{ secrets.PRODUCTION_REGISTRY_USERNAME }}
-          REGISTRY_PASSWORD: ${{ secrets.PRODUCTION_REGISTRY_PASSWORD }}
+          REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}
+          REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
           GATEWAY_VERSION: ${{ inputs.gateway_version }}
           LOGICAL_ID: ${{ inputs.logical_id }}
           VERSION: ${{ inputs.version }}
