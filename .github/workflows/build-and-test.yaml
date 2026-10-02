@@ -85,7 +85,12 @@ jobs:
   plugin-release-tool-test:
     runs-on: ubuntu-22.04
     steps:
+      # first_release_test.go clones this repository shared and checks out
+      # historical fixture commits (d3c0721d and ancestor 39ec41aa), which a
+      # shallow clone cannot serve.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: "Setup Go"
         uses: actions/setup-go@v5
