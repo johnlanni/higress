@@ -142,7 +142,7 @@ jobs:
             echo "promotion is not authorized: preparation PR #$pr_number does not match the deterministic preparation branch $branch and title \"$title\"" >&2
             exit 1
           fi
-          if [ "$(jq --arg label "$label" '[.[0].labels[].name] | any(. == $label)' <<<"$candidates")" != true ]; then
+          if [ "$(jq --arg label_id "$label" '[.[0].labels[].name] | any(. == $label_id)' <<<"$candidates")" != true ]; then
             echo "promotion is not authorized: preparation PR #$pr_number does not carry the label $label that authorizes this release" >&2
             exit 1
           fi
