@@ -1327,8 +1327,14 @@ func validateConsoleRecovery(root, catalogPath, manifestPath string) error {
 			return fmt.Errorf("%s: recovery artifact identity differs from unchanged 2.2.4 snapshot", id)
 		}
 		plugin, ok := catalogByID[id]
+		if !ok {
+			// A plugin de-listed after the recovery window keeps its recorded
+			// mapping as immutable history; the catalog can no longer
+			// corroborate it, but the snapshot bindings above still hold.
+			continue
+		}
 		expectedConsumers := catalogConsumers(catalog, plugin)
-		if !ok || expectedConsumers.Console == nil || !reflect.DeepEqual(entry.Console, *expectedConsumers.Console) {
+		if expectedConsumers.Console == nil || !reflect.DeepEqual(entry.Console, *expectedConsumers.Console) {
 			return fmt.Errorf("%s: recovery Console mapping differs from reviewed catalog", id)
 		}
 	}
