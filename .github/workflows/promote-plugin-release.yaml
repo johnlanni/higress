@@ -190,6 +190,7 @@ jobs:
           SNAPSHOT_SHA256: ${{ inputs.snapshot_sha256 }}
         run: |
           set -euo pipefail
+          source tools/hack/oras-retry.sh
           [[ "$SOURCE_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]
           [[ "$SNAPSHOT_PATH" =~ ^plugins/release/snapshots/[0-9]+\.[0-9]+\.[0-9]+\.json$ ]]
           [[ "$SNAPSHOT_SHA256" =~ ^[0-9a-f]{64}$ ]]
@@ -225,6 +226,7 @@ jobs:
           SOURCE_COMMIT: ${{ inputs.source_commit }}
         run: |
           set -euo pipefail
+          source tools/hack/oras-retry.sh
           test -n "$REGISTRY"; test -n "$REGISTRY_USERNAME"; test -n "$REGISTRY_PASSWORD"
           test -n "$CANDIDATE_REGISTRY"; test -n "$CANDIDATE_USERNAME"; test -n "$CANDIDATE_PASSWORD"
           echo "$REGISTRY_PASSWORD" | oras login "$REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
@@ -357,6 +359,7 @@ jobs:
           SOURCE_COMMIT: ${{ inputs.source_commit }}
         run: |
           set -euo pipefail
+          source tools/hack/oras-retry.sh
           [[ "$SOURCE_COMMIT" =~ ^[0-9a-fA-F]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$SOURCE_COMMIT"
           test -n "$REGISTRY"; test -n "$REGISTRY_USERNAME"; test -n "$REGISTRY_PASSWORD"

@@ -1595,8 +1595,8 @@ func TestPreparationBootstrapReusesProtectedCandidateRegistryCredential(t *testi
 	workflow := string(data)
 	for _, required := range []string{
 		`CANDIDATE_REGISTRY: ${{ vars.PLUGIN_CANDIDATE_REGISTRY }}`,
-		`REGISTRY_USERNAME: ${{ secrets.CANDIDATE_REGISTRY_USERNAME }}`,
-		`REGISTRY_PASSWORD: ${{ secrets.CANDIDATE_REGISTRY_PASSWORD }}`,
+		`REGISTRY_USERNAME: ${{ secrets.REGISTRY_USERNAME }}`,
+		`REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}`,
 		`[[ "$CANDIDATE_REGISTRY" =~ ^[a-z0-9][a-z0-9.-]*(\:[0-9]+)?$ ]]`,
 		`test "$CANDIDATE_REGISTRY" = "$(jq -er .registry plugins/release/catalog.json)"`,
 		`test -n "$REGISTRY_USERNAME"; test -n "$REGISTRY_PASSWORD"`,

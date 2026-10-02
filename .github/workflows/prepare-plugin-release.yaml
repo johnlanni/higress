@@ -53,6 +53,9 @@ jobs:
           TARGET_REF: ${{ inputs.target_ref }}
         run: |
           set -euo pipefail
+          # Transient ACR transport failures are retried; 404/authorization
+          # responses still fail fast for the classifier below.
+          source tools/hack/oras-retry.sh
           [[ "$TARGET_REF" =~ ^[0-9a-f]{40}$ ]]
           test "$(git rev-parse HEAD)" = "$TARGET_REF"
           attempted=0
@@ -177,6 +180,7 @@ jobs:
           REGISTRY_PASSWORD: ${{ secrets.REGISTRY_PASSWORD }}
         run: |
           set -euo pipefail
+          source tools/hack/oras-retry.sh
           (cd tools/plugin-release && go run . validate-catalog --root ../.. --catalog ../../plugins/release/catalog.json)
           mkdir -p plugins/release/snapshots plugins/release/plans plugins/release/evidence plugins/release/bootstrap-evidence
           if [ -z "$PREVIOUS" ]; then
@@ -231,6 +235,7 @@ jobs:
           GATEWAY_VERSION: ${{ inputs.gateway_version }}
         run: |
           set -euo pipefail
+          source tools/hack/oras-retry.sh
           test -n "$CANDIDATE_REGISTRY"; test -n "$REGISTRY_USERNAME"; test -n "$REGISTRY_PASSWORD"
           echo "$REGISTRY_PASSWORD" | oras login "$CANDIDATE_REGISTRY" -u "$REGISTRY_USERNAME" --password-stdin
           (cd tools/plugin-release && GOMAXPROCS=1 go build -p 1 -o /tmp/plugin-release-prepare .)
