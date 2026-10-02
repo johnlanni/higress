@@ -115,7 +115,9 @@ jobs:
           head_repository=$(jq -r '.[0].head.repo.full_name // ""' <<<"$candidates")
           head_fork=$(jq -r '.[0].head.repo.fork' <<<"$candidates")
           head_sha=$(jq -r '.[0].head.sha // ""' <<<"$candidates")
-          maintainer_can_modify=$(jq -r '.[0].maintainer_can_modify' <<<"$candidates")
+          # The commit-associated pulls endpoint omits maintainer_can_modify
+          # (always null there); the single-PR endpoint provides it.
+          maintainer_can_modify=$(gh api "repos/$GITHUB_REPOSITORY/pulls/$pr_number" | jq -r '.maintainer_can_modify')
           head_ref=$(jq -r '.[0].head.ref // ""' <<<"$candidates")
           pr_title=$(jq -r '.[0].title // ""' <<<"$candidates")
           if ! [[ "$pr_number" =~ ^[0-9]+$ ]]; then
