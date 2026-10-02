@@ -481,7 +481,10 @@ func buildPlan(root, catalogPath, previousPath, baseRef, targetRef, gatewayVersi
 	plugins := append([]Plugin(nil), c.Plugins...)
 	sort.Slice(plugins, func(i, j int) bool { return plugins[i].LogicalID < plugins[j].LogicalID })
 	plan := Plan{SchemaVersion: planSchemaVersion, GatewayVersion: gatewayVersion, SourceCommit: target, BaseCommit: base,
-		PreviousRelease: previous.GatewayVersion, CatalogSHA256: sha256Hex(catalogData)}
+		PreviousRelease: previous.GatewayVersion, CatalogSHA256: sha256Hex(catalogData),
+		// Empty plans must serialize as [] rather than null: workflow jq
+		// iteration over .plugins[] fails on null.
+		Plugins: []PlanEntry{}, Deferred: []DeferredPlugin{}}
 	for _, p := range plugins {
 		if !p.ReleaseEligible {
 			continue
@@ -510,7 +513,22 @@ func buildPlan(root, catalogPath, previousPath, baseRef, targetRef, gatewayVersi
 		}
 		prev, hasPrevious := previousEntries[p.LogicalID]
 		_, hasOverride := overrides[p.LogicalID]
-		affected := base == "" || len(changed) > 0 || hasOverride
+		// A VERSION-only change whose tree value exactly restates the version
+		// the previous snapshot already recorded is that preparation's own
+		// bookkeeping edit, not a release signal: a managed snapshot's
+		// sourceCommit is its freeze point, which always predates the VERSION
+		// edits its preparation PR applies, so a re-preparation against an
+		// unpromoted previous snapshot would otherwise re-bump every plugin.
+		// A hand-edited VERSION (differing from the recorded version) and
+		// bootstrap-public baselines keep the historical behavior.
+		restatePrevious := hasPrevious && previous.ProvenanceMode != "bootstrap-public" && current == prev.Version
+		affected := base == "" || hasOverride
+		for _, path := range changed {
+			if restatePrevious && path == p.SourceDir+"/VERSION" {
+				continue
+			}
+			affected = true
+		}
 		if previous.ProvenanceMode == "bootstrap-public" && hasPrevious {
 			previousVersion, parseErr := parseSemver(prev.Version)
 			if parseErr != nil {
