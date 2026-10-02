@@ -572,7 +572,9 @@ jobs:
           # without it, so the label must exist before the PR is opened. Label
           # management requires the release App installation to hold label write
           # permission alongside its contents/pull-requests permissions.
-          label_ref=$(jq -rn --arg label "$label" '$label | @uri')
+          # jq 1.6 resolves $label as the label keyword; name the variable
+          # $label_id so the filter parses on both jq 1.6 and 1.7.
+          label_ref=$(jq -rn --arg label_id "$label" '$label_id | @uri')
           if ! gh api "repos/$GITHUB_REPOSITORY/labels/$label_ref" >/dev/null 2>&1; then
             gh label create "$label" --color "0969da" --description "Authorizes promote-plugin-release for plugin snapshot $GATEWAY_VERSION"
           fi

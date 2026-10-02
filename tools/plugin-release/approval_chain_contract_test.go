@@ -1142,7 +1142,7 @@ func TestPreparationSweepsRegistryBeforeOpeningThePR(t *testing.T) {
 	for _, required := range []string{
 		"# BEGIN preparation-pr-contract",
 		`label="release/$GATEWAY_VERSION"`,
-		`label_ref=$(jq -rn --arg label "$label" '$label | @uri')`,
+		`label_ref=$(jq -rn --arg label_id "$label" '$label_id | @uri')`,
 		`if ! gh api "repos/$GITHUB_REPOSITORY/labels/$label_ref" >/dev/null 2>&1; then`,
 		`gh label create "$label"`,
 		`test "$(gh api "repos/$GITHUB_REPOSITORY/labels/$label_ref" --jq .name)" = "$label"`,

@@ -104,6 +104,7 @@ jobs:
       - name: Run plugin-release tool tests
         run: |-
           go version
+          jq --version
           GOPROXY="https://proxy.golang.org,direct" make go.test.plugin-release
 
   build:
