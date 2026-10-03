@@ -1317,7 +1317,7 @@ func TestPromotionBackfillsVersionTagAndJoinsMonotonicLatest(t *testing.T) {
 		t.Fatal("backfill is provenance/migration state, never a blanket exclusion from latest")
 	}
 	latestDigest := strings.Index(workflow, `if [ "$old_digest" = "$digest" ]; then`)
-	latestAnnotation := strings.Index(workflow, `old=$(oras manifest fetch "$latest" --format json`)
+	latestAnnotation := strings.Index(workflow, `old=$(oras manifest fetch "$latest" | jq -r '.annotations["org.opencontainers.image.version"] // empty')`)
 	if latestDigest < 0 || latestAnnotation < 0 || latestDigest > latestAnnotation {
 		t.Fatal("latest promotion must accept an identical digest before requiring a legacy version annotation")
 	}

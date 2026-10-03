@@ -481,7 +481,7 @@ jobs:
                 # predates release annotations. Accept it without a write.
                 old=""; state=identical
               else
-                old=$(oras manifest fetch "$latest" --format json | jq -r '.annotations["org.opencontainers.image.version"] // empty')
+                old=$(oras manifest fetch "$latest" | jq -r '.annotations["org.opencontainers.image.version"] // empty')
                 if [ -z "$old" ]; then
                   if [ "${ADOPT_UNANNOTATED_LATEST:-false}" = "true" ]; then
                     # Bridge for pre-pipeline manual latest tags: adopt the
